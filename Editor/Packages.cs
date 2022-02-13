@@ -464,6 +464,7 @@ namespace SLIDDES.PackageManager
                 }
 
                 finishedRemovingPackage = true;
+                RemoveRequest = null;
                 EditorApplication.update -= AwaitRemovePackage;
             }
         }
