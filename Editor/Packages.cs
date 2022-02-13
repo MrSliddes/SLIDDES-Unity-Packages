@@ -605,7 +605,7 @@ namespace SLIDDES.PackageManager
         /// <param name="indentifier"></param>
         private void RemovePackage(string indentifier)
         {
-            if(RemoveRequest != null || !RemoveRequest.IsCompleted) return;
+            if(RemoveRequest != null || RemoveRequest != null && !RemoveRequest.IsCompleted) return;
 
             if(EditorUtility.DisplayDialog("Packages", string.Format("Are you sure you want to delete {0}?", indentifier), "Delete", "No"))
             {
