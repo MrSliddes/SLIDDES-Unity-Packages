@@ -10,9 +10,13 @@ using UnityEngine.Networking;
 
 namespace SLIDDES.PackageManager
 {
+    /// <summary>
+    /// For installing/updating SLIDDES/custom packages from a git url
+    /// </summary>
     public class Packages : EditorWindow
     {
         private static AddRequest AddRequest;
+        private static RemoveRequest RemoveRequest;
         private static ListRequest ListRequest;
 
         private readonly string DEBUG_PREFIX = "[Packages] ";
@@ -25,7 +29,7 @@ namespace SLIDDES.PackageManager
         {
             get
             {
-                if(finishedAddingPackage && finishedGetPackageList && finishedGetPackagesUnity) return false;
+                if(finishedAddingPackage && finishedGetPackageList && finishedGetPackagesUnity && finishedRemovingPackage && finishedUpdatingPackages) return false;
                 return true;
             }
         }
@@ -43,6 +47,8 @@ namespace SLIDDES.PackageManager
         private bool finishedAddingPackage = true;
         private bool finishedGetPackageList = true;
         private bool finishedGetPackagesUnity = true;
+        private bool finishedRemovingPackage = true;
+        private bool finishedUpdatingPackages = true;
         /// <summary>
         /// The url where the package list is stored on github
         /// </summary>
@@ -57,7 +63,7 @@ namespace SLIDDES.PackageManager
         /// </summary>
         private List<PackageInfo> packageListAvailable = new List<PackageInfo>();
         /// <summary>
-        /// All packages installed in project from SLIDDES
+        /// All packages installed in project from SLIDDES/Custom
         /// </summary>
         private List<PackageInfo> packageListInstalled = new List<PackageInfo>();
         /// <summary>
@@ -129,6 +135,7 @@ namespace SLIDDES.PackageManager
         private void OnGUIRefreshButton()
         {
             GUI.enabled = !IsBusy;
+            // Refresh button
             if(GUILayout.Button(new GUIContent("Refresh Packages", "Check for all packages in Unity and SLIDDES available packages"), GUILayout.Height(32)))
             {
                 RefreshPackages();
@@ -143,6 +150,13 @@ namespace SLIDDES.PackageManager
                 GUI.Label(R, new GUIContent(EditorGUIUtility.IconContent("Loading@2x").image));
                 GUI.matrix = Matrix4x4.identity;
             }
+
+            // Update all button
+            if(GUILayout.Button(new GUIContent("Update All Packages", "Updates all installed packages"), GUILayout.Height(32)))
+            {
+                UpdateAllPackages();
+            }
+
             GUI.enabled = true;
             EditorGUILayout.Space();
         }
@@ -198,6 +212,8 @@ namespace SLIDDES.PackageManager
                     }
 
                     GUI.enabled = !IsBusy;
+                    EditorGUILayout.BeginHorizontal();
+                    // Installed/update button
                     if(GUILayout.Button(new GUIContent("", EditorGUIUtility.IconContent(img).image, tooltip), new GUILayoutOption[] { GUILayout.Height(dropdownLineHeight), GUILayout.Width(32) }))
                     {
                         switch(state)
@@ -217,6 +233,13 @@ namespace SLIDDES.PackageManager
                             default: break;
                         }
                     }
+
+                    // Remove button
+                    if(GUILayout.Button(new GUIContent("", EditorGUIUtility.IconContent("sv_icon_none").image, "Uninstall Package"), new GUILayoutOption[] { GUILayout.Height(dropdownLineHeight), GUILayout.Width(32) }))
+                    {
+                        RemovePackage(package.name);
+                    }
+                    EditorGUILayout.EndHorizontal();
                     GUI.enabled = true;
                 }
                 EditorGUIUtility.labelWidth = preLabelWidth;
@@ -331,6 +354,14 @@ namespace SLIDDES.PackageManager
         }
 
         /// <summary>
+        /// Convert a UnityEditor.PackageManager.PackageInfo to SLIDDES.PackageManager.Packages.PackageInfo
+        /// </summary>
+        private static PackageInfo ToPackageInfo(UnityEditor.PackageManager.PackageInfo p)
+        {
+            return new PackageInfo(p.name, p.displayName, p.version, p.versions.latest, "N/A");
+        }
+
+        /// <summary>
         /// Add a package to this unity project
         /// </summary>
         /// <param name="indentifier">
@@ -348,7 +379,7 @@ namespace SLIDDES.PackageManager
             if(AddRequest == null || AddRequest.IsCompleted)
             {
                 finishedAddingPackage = false;
-                UnityEngine.Debug.Log(DEBUG_PREFIX + "Adding package " + indentifier + " ...");
+                UnityEngine.Debug.Log(DEBUG_PREFIX + "Adding package " + indentifier + "...");
                 AddRequest = Client.Add(indentifier);
                 EditorApplication.update += AwaitAddPackage;
             }
@@ -411,6 +442,29 @@ namespace SLIDDES.PackageManager
 
                 finishedAddingPackage = true;
                 EditorApplication.update -= AwaitAddPackage;
+            }
+        }
+
+        /// <summary>
+        /// Wait until RemoveRequest is completed to refresh packages
+        /// </summary>
+        private void AwaitRemovePackage()
+        {
+            if(RemoveRequest.IsCompleted)
+            {
+                if(RemoveRequest.Status == StatusCode.Success)
+                {
+                    Debug.Log(DEBUG_PREFIX + "Removed: " + RemoveRequest.PackageIdOrName);
+                    // Refresh packages
+                    RefreshPackages();
+                }
+                else if(AddRequest.Status >= StatusCode.Failure)
+                {
+                    Debug.Log(DEBUG_PREFIX + RemoveRequest.Error.message);
+                }
+
+                finishedRemovingPackage = true;
+                EditorApplication.update -= AwaitRemovePackage;
             }
         }
 
@@ -497,6 +551,7 @@ namespace SLIDDES.PackageManager
                             // Git package version is newer than installed package
                             packageInstalled.versionLatest = package.versionLatest;
                             packageInstalled.giturl = package.giturl;
+                            packageInstalled.isLatestVersion = false;
                         }
                     }
                     else
@@ -545,13 +600,45 @@ namespace SLIDDES.PackageManager
         }
 
         /// <summary>
-        /// Convert a UnityEditor.PackageManager.PackageInfo to SLIDDES.PackageManager.Packages.PackageInfo
+        /// Remove a package from unity
         /// </summary>
-        private static PackageInfo ToPackageInfo(UnityEditor.PackageManager.PackageInfo p)
+        /// <param name="indentifier"></param>
+        private void RemovePackage(string indentifier)
         {
-            return new PackageInfo(p.name, p.displayName, p.version, p.versions.latest, "N/A");
-        }
+            if(RemoveRequest != null) return;
+
+            if(EditorUtility.DisplayDialog("Packages", string.Format("Are you sure you want to delete {0}?", indentifier), "Delete", "No"))
+            {
+                finishedRemovingPackage = false;
+                UnityEngine.Debug.Log(DEBUG_PREFIX + "Removing package " + indentifier + "...");
+                RemoveRequest = Client.Remove(indentifier);
+                EditorApplication.update += AwaitRemovePackage;
                 
+            }
+        }
+
+        /// <summary>
+        /// Updates all SLIDDES/Custom installed packages
+        /// </summary>
+        private void UpdateAllPackages()
+        {
+            finishedUpdatingPackages = false;
+            foreach(var package in packageListInstalled)
+            {
+                if(!package.isLatestVersion)
+                {
+                    // Update package, ask for convermation
+                    if(EditorUtility.DisplayDialog("Packages", string.Format("Are you sure you want to update {0}{1} to {2}?", package.displayName, package.version, package.versionLatest), "Yes", "No"))
+                    {
+                        AddPackage(package.giturl);
+                    }
+                }
+            }
+            finishedUpdatingPackages = true;
+            EditorUtility.DisplayDialog("Packages", "Finished updating packages.", "Okay");
+        }
+
+
         private void Save()
         {
             EditorPrefs.SetString(EDITORPREF_PREFIX + "packageListUrl", packageListUrl);
@@ -559,7 +646,7 @@ namespace SLIDDES.PackageManager
 
         private void Load()
         {
-            packageListUrl = EditorPrefs.GetString(EDITORPREF_PREFIX + "packageListUrl", "");
+            packageListUrl = EditorPrefs.GetString(EDITORPREF_PREFIX + "packageListUrl", packageListUrlDefault);
             CheckPackageListUrl();
         }
     }

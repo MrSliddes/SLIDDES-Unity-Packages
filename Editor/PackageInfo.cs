@@ -8,6 +8,10 @@ namespace SLIDDES.PackageManager
     public class PackageInfo
     {
         /// <summary>
+        /// Is the package the latest version available?
+        /// </summary>
+        public bool isLatestVersion = true;
+        /// <summary>
         /// Name of the package (com.sliddes.name)
         /// </summary>
         public string name;
@@ -28,13 +32,14 @@ namespace SLIDDES.PackageManager
         /// </summary>
         public string giturl;
 
-        public PackageInfo(string name, string displayName, string version, string versionLatest, string giturl)
+        public PackageInfo(string name, string displayName, string version, string versionLatest, string giturl, bool isLatestVersion = true)
         {
             this.name = name;
             this.displayName = displayName;
             this.version = version;
             this.versionLatest = versionLatest;
             this.giturl = giturl;
+            this.isLatestVersion = isLatestVersion;
         }
     }
 }

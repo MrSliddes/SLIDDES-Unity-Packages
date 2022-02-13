@@ -1,6 +1,6 @@
 {
   "name": "com.sliddes.packages",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "SLIDDES Packages",
   "description": "Package manager for SLIDDES packages or your own custom packages.\n\nImportant to have a Unity version of 2020.3 or higher.",
   "keywords": [
